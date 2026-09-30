@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Operation Overgrowth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: poster as the stage with pulsing target pins; a HUD readout panel beside it (below on phones). Single dark look, taken from the poster. */
+:root {
+  --void: #050807;
+  --panel: #0a110d;
+  --line: #1f3a2a;
+  --phosphor: #6cf59a;
+  --moss: #9bc46a;
+  --text: #cfe3d4;
+  --dim: #7d9686;
+  --warn: #f2d27a;
+  --display: "Chakra Petch", "Rajdhani", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--void);
+  color: var(--text);
+  font: 14px/1.6 var(--mono);
+  padding-inline: 16px;
+  padding-block: 20px 40px;
+  min-height: 100%;
+}
+header {
+  max-width: 1080px; margin: 0 auto 18px;
+  display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px;
+}
+h1 {
+  font: 700 clamp(26px, 5vw, 40px)/1 var(--display);
+  letter-spacing: .06em; text-transform: uppercase; margin: 0; color: var(--phosphor);
+  text-wrap: balance;
+}
+.sub { margin: 6px 0 0; color: var(--dim); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+.controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.counter { font-variant-numeric: tabular-nums; color: var(--moss); font-size: 13px; letter-spacing: .08em; }
+button {
+  font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  background: transparent; color: var(--phosphor); border: 1px solid var(--line);
+  padding: 9px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--phosphor); }
+button:focus-visible, .pin:focus-visible { outline: 2px solid var(--warn); outline-offset: 3px; }
+button[aria-pressed="true"] { background: var(--phosphor); color: var(--void); }
+
+main {
+  max-width: 1080px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start;
+}
+@media (max-width: 820px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { position: relative; max-width: 100%; margin: 0 auto; width: 100%; max-width: 720px; user-select: none; }
+.stage img { display: block; width: 100%; height: auto; }
+.stage.shake { animation: shake .35s linear; }
+@keyframes shake {
+  20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, -1px); }
+}
+canvas.fx, svg.fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.pin {
+  position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+  border-radius: 50%; border: 1.5px solid var(--phosphor); background: rgba(5, 8, 7, .35);
+  cursor: pointer; padding: 0;
+}
+.pin::before {
+  content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--phosphor);
+  box-shadow: 0 0 10px var(--phosphor);
+}
+.pin::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 1px solid var(--phosphor);
+  animation: ping 2.2s ease-out infinite;
+}
+.pin.seen { border-color: var(--moss); }
+.pin.seen::before { background: var(--moss); box-shadow: none; inset: 11px; }
+.pin.seen::after { animation: none; opacity: 0; }
+.pin.active { border-color: var(--warn); }
+.pin.active::before { background: var(--warn); box-shadow: 0 0 12px var(--warn); }
+.pin .tip {
+  position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  background: var(--void); border: 1px solid var(--line); color: var(--phosphor);
+  font: 600 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 5px 7px; white-space: nowrap; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.pin:hover .tip, .pin:focus-visible .tip, .stage.reveal .pin .tip { opacity: 1; }
+.stage.quiet .pin:not(.active) { opacity: 0; }
+.stage.quiet .pin:not(.active):hover { opacity: 1; }
+@keyframes ping { from { transform: scale(1); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
+
+aside {
+  border: 1px solid var(--line); background: var(--panel); padding: 18px;
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); min-width: 0;
+}
+.tag { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 8px; }
+aside h2 { font: 700 24px/1.1 var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--phosphor); margin: 10px 0 12px; text-wrap: balance; }
+aside p { margin: 0 0 14px; max-width: 65ch; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 14px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+dt { color: var(--dim); text-transform: uppercase; letter-spacing: .1em; }
+dd { margin: 0; color: var(--moss); font-variant-numeric: tabular-nums; text-align: right; }
+.hint { font-size: 12px; color: var(--dim); margin: 0; }
+.cursor::after { content: "▌"; color: var(--phosphor); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pin::after, .cursor::after { animation: none; }
+  .stage.shake { animation: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Operation Overgrowth</h1>
+    <p class="sub">Field unit GR-7 · click the targets on the poster</p>
+  </div>
+  <div class="controls">
+    <span class="counter" id="counter">00 / 10 scanned</span>
+    <button type="button" id="labels" aria-pressed="false">Show labels</button>
+    <button type="button" id="hide" aria-pressed="false">Hide targets</button>
+  </div>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <img src="poster.png" alt="Poster: an armored astronaut fires a green beam that turns into a forest full of mushrooms, framed by HUD text panels." width="959" height="1161" draggable="false">
+    <svg class="fx" id="beamfx" viewBox="0 0 959 1161" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+  </div>
+
+  <aside aria-live="polite">
+    <div class="tag"><span id="p-tag">Standby</span><span id="p-id">—</span></div>
+    <h2 id="p-title">Awaiting target</h2>
+    <p id="p-text" class="cursor">Tap any glowing dot on the poster. Each one opens a readout, and some of them do something. Try the gun first.</p>
+    <dl id="p-stats"></dl>
+    <p class="hint" id="p-hint">Tip: press Tab to cycle through targets with the keyboard.</p>
+  </aside>
+</main>
+
+<script>
+const TARGETS = [
+  { id: "helmet", x: 51.2, y: 20.5, label: "Helmet",
+    tag: "Crew", title: "GR-7 pressure helm",
+    text: "Pitted ceramic shell, dented from three re-entries. The visor is tinted against the beam's glare. Nobody has seen the pilot's face since launch.",
+    stats: [["Visor tint", "OD 4+"], ["Air left", "71 %"], ["Dents logged", "212"]], fx: "scan" },
+  { id: "gun", x: 20, y: 25.2, label: "Seeder rifle",
+    tag: "Hardware", title: "Seeder rifle Mk II",
+    text: "It doesn't shoot bullets. It fires a 532 nm beam loaded with compressed spores that wake up on contact with rock. Click again to fire.",
+    stats: [["Wavelength", "532 nm"], ["Charge", "98 %"], ["Payload", "4.1 × 10⁹ spores"]], fx: "fire" },
+  { id: "reticle", x: 9.6, y: 25.5, label: "Reticle",
+    tag: "HUD", title: "Targeting reticle",
+    text: "The rangefinder ring locks on to barren ground and paints it green before the beam lands. Range and bearing tick in the corner.",
+    stats: [["Range", "38.4 m"], ["Bearing", "271°"], ["Lock", "Solid"]], fx: "spin" },
+  { id: "beam", x: 31, y: 32, label: "Beam",
+    tag: "Phenomenon", title: "The growth cone",
+    text: "Where the beam spreads out, dead stone turns into living soil in under a second. The edge of the cone is the only place you can watch it happen.",
+    stats: [["Spread", "22°"], ["Growth rate", "3.6 m/s"], ["Soil depth", "40 cm"]], fx: "fire" },
+  { id: "arm", x: 58, y: 29, label: "Shoulder rig",
+    tag: "Hardware", title: "Recoil shoulder rig",
+    text: "Hydraulic pads soak up the kick when the rifle discharges. Without it the pilot would spin off into the dark on every shot.",
+    stats: [["Recoil", "1.9 kN"], ["Hydraulics", "Nominal"]], fx: "scan" },
+  { id: "mushroom", x: 71.6, y: 61.2, label: "Mushrooms",
+    tag: "Biology", title: "Lantern caps",
+    text: "The first thing to sprout. Each cap puffs out spores that seed the next metre of forest. Click to shake some loose.",
+    stats: [["Cap width", "4–9 cm"], ["Spores / puff", "~12 000"], ["Edible", "Unknown"]], fx: "spores" },
+  { id: "forest", x: 74, y: 49, label: "Canopy",
+    tag: "Biology", title: "Instant canopy",
+    text: "A full shrub layer, grown in the time it took to read this sentence. Moss, low pines and something that smells a lot like thyme.",
+    stats: [["Species", "37 found"], ["O₂ output", "+14 %"], ["Age", "6 seconds"]], fx: "leaves" },
+  { id: "rock", x: 88.6, y: 70, label: "Boulder",
+    tag: "Geology", title: "Unconverted boulder",
+    text: "Grey basalt the beam hasn't reached yet. Lichen is already creeping up one side. Give it a minute.",
+    stats: [["Mass", "~2.3 t"], ["Converted", "8 %"]], fx: "scan" },
+  { id: "leg", x: 38.5, y: 66, label: "Leg armor",
+    tag: "Hardware", title: "Knee and shin plating",
+    text: "The lower plates are crusted with grit from a planet that had nothing growing on it an hour ago. Mud on the boots is a new problem.",
+    stats: [["Plate", "Ceramic-Ti"], ["Wear", "31 %"]], fx: "scan" },
+  { id: "hud", x: 12.5, y: 9.5, label: "Log panel",
+    tag: "HUD", title: "Mission log",
+    text: "Day 212. Sector nine was bare rock this morning. Tonight it has a forest, a lot of mushrooms and, according to the sensors, one very confused beetle.",
+    stats: [["Sectors greened", "9 / 40"], ["Uptime", "212 d"]], fx: "decode" }
+];
+
+const stage = document.getElementById("stage");
+const counter = document.getElementById("counter");
+const els = {
+  tag: document.getElementById("p-tag"), id: document.getElementById("p-id"),
+  title: document.getElementById("p-title"), text: document.getElementById("p-text"),
+  stats: document.getElementById("p-stats"), hint: document.getElementById("p-hint")
+};
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const seen = new Set();
+let active = null;
+
+TARGETS.forEach((t, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "pin";
+  b.style.left = t.x + "%";
+  b.style.top = t.y + "%";
+  b.setAttribute("aria-label", t.label);
+  b.innerHTML = `<span class="tip">${t.label}</span>`;
+  b.addEventListener("click", () => select(t, b));
+  t.el = b;
+  stage.appendChild(b);
+});
+
+function select(t, b) {
+  const again = active === t;
+  if (active) active.el.classList.remove("active");
+  active = t;
+  b.classList.add("active", "seen");
+  seen.add(t.id);
+  counter.textContent = String(seen.size).padStart(2, "0") + " / " + String(TARGETS.length).padStart(2, "0") + " scanned";
+
+  els.tag.textContent = t.tag;
+  els.id.textContent = "#" + String(TARGETS.indexOf(t) + 1).padStart(2, "0");
+  els.title.textContent = t.title;
+  els.stats.innerHTML = t.stats.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  els.hint.textContent = seen.size === TARGETS.length ? "All targets scanned. Sector cleared for planting." : "";
+  typeOut(els.text, t.text, t.fx === "decode");
+
+  const rect = stage.getBoundingClientRect();
+  const px = t.x / 100 * rect.width, py = t.y / 100 * rect.height;
+  if (!again && t.fx !== "fire") ripple(px, py);
+  ({ fire, scan: () => scan(px, py), spores: () => burst(px, py, "spore"), leaves: () => burst(px, py, "leaf"), spin: () => spin(px, py), decode: () => scan(px, py) })[t.fx]?.();
+}
+
+/* text typing / decoding */
+let typeTimer;
+function typeOut(el, text, scramble) {
+  clearInterval(typeTimer);
+  if (reduced) { el.textContent = text; el.classList.remove("cursor"); return; }
+  el.classList.add("cursor");
+  let i = 0;
+  const glyphs = "#%&@$*+=/<>01";
+  typeTimer = setInterval(() => {
+    i += scramble ? 2 : 3;
+    let out = text.slice(0, i);
+    if (scramble && i < text.length) {
+      for (let k = 0; k < 6 && i + k < text.length; k++) out += glyphs[Math.random() * glyphs.length | 0];
+    }
+    el.textContent = out;
+    if (i >= text.length) { el.textContent = text; clearInterval(typeTimer); el.classList.remove("cursor"); }
+  }, 16);
+}
+
+/* beam flash along the painted beam */
+const svg = document.getElementById("beamfx");
+function fire() {
+  if (reduced) return;
+  stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake");
+  const NS = "http://www.w3.org/2000/svg";
+  const paths = ["M140 292 L420 420 L905 600", "M150 300 L440 380 L500 900", "M145 296 L430 400 L700 760"];
+  paths.forEach((d, i) => {
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", d);
+    p.setAttribute("fill", "none");
+    p.setAttribute("stroke", "#6cf59a");
+    p.setAttribute("stroke-width", i === 2 ? 9 : 4);
+    p.setAttribute("stroke-linecap", "round");
+    p.style.filter = "drop-shadow(0 0 6px #6cf59a)";
+    const len = 1400;
+    p.setAttribute("stroke-dasharray", len);
+    p.setAttribute("stroke-dashoffset", len);
+    svg.appendChild(p);
+    p.animate([{ strokeDashoffset: len, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: .55 }, { strokeDashoffset: 0, opacity: 0 }],
+      { duration: 700, delay: i * 40, easing: "ease-out", fill: "forwards" }).onfinish = () => p.remove();
+  });
+  const r = stage.getBoundingClientRect();
+  setTimeout(() => burst(.72 * r.width, .62 * r.height, "leaf"), 380);
+}
+
+/* canvas particles */
+const canvas = document.getElementById("fx");
+const ctx = canvas.getContext("2d");
+let parts = [], running = false;
+function sizeCanvas() {
+  const r = stage.getBoundingClientRect(), d = devicePixelRatio || 1;
+  canvas.width = r.width * d; canvas.height = r.height * d;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+}
+new ResizeObserver(sizeCanvas).observe(stage);
+
+function add(p) { parts.push(p); if (!running) { running = true; requestAnimationFrame(tick); } }
+function tick() {
+  const r = stage.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+  parts = parts.filter(p => (p.life -= 1) > 0);
+  for (const p of parts) {
+    p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .985; p.rot += p.vr;
+    const a = Math.min(1, p.life / 30);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(p.x, p.y);
+    if (p.kind === "ring") {
+      ctx.strokeStyle = "#6cf59a"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, p.r += 1.6, 0, Math.PI * 2); ctx.stroke();
+    } else if (p.kind === "scan") {
+      ctx.strokeStyle = "#6cf59a"; ctx.lineWidth = 1;
+      const w = 90, h = 90, y = -h / 2 + (1 - p.life / p.max) * h;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.fillStyle = "rgba(108,245,154,.25)"; ctx.fillRect(-w / 2, y, w, 3);
+    } else if (p.kind === "spin") {
+      ctx.rotate(p.rot); ctx.strokeStyle = "#f2d27a"; ctx.lineWidth = 1.5;
+      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(0, 0, 42, k * Math.PI / 2 + .2, k * Math.PI / 2 + 1.2); ctx.stroke(); }
+    } else if (p.kind === "leaf") {
+      ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.8, p.r, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.fillStyle = p.c; ctx.shadowColor = p.c; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (parts.length) requestAnimationFrame(tick); else running = false;
+}
+function ripple(x, y) { if (!reduced) add({ kind: "ring", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: 0, r: 8, life: 40, max: 40 }); }
+function scan(x, y) { if (!reduced) add({ kind: "scan", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: 0, life: 70, max: 70 }); }
+function spin(x, y) { if (!reduced) add({ kind: "spin", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: .08, life: 90, max: 90 }); }
+function burst(x, y, kind) {
+  if (reduced) return;
+  const n = kind === "spore" ? 60 : 36;
+  const cols = kind === "spore" ? ["#f4f1d0", "#e8f7c8", "#f2d27a"] : ["#4f8a3a", "#7fb04d", "#2f6b34", "#9bc46a"];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = Math.random() * (kind === "spore" ? 1.6 : 3.2);
+    add({ kind, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - (kind === "spore" ? 1.2 : 1.5),
+      g: kind === "spore" ? -0.01 : 0.06, rot: Math.random() * 6, vr: (Math.random() - .5) * .2,
+      r: kind === "spore" ? 1 + Math.random() * 2 : 2 + Math.random() * 3,
+      c: cols[Math.random() * cols.length | 0], life: 60 + Math.random() * 60, max: 120 });
+  }
+}
+
+/* controls */
+const labelsBtn = document.getElementById("labels");
+labelsBtn.addEventListener("click", () => {
+  const on = stage.classList.toggle("reveal");
+  labelsBtn.setAttribute("aria-pressed", on);
+});
+const hideBtn = document.getElementById("hide");
+hideBtn.addEventListener("click", () => {
+  const on = stage.classList.toggle("quiet");
+  hideBtn.setAttribute("aria-pressed", on);
+  hideBtn.textContent = on ? "Show targets" : "Hide targets";
+});
+</script>
+</body>
+</html>
