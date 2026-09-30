@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: poster as the stage with pulsing target pins; a HUD readout panel beside it (below on phones). Single dark look, taken from the poster. */
+/* Layout: the poster is a camera feed. Clicking flies the camera in, letterbox bars and a targeting HUD close around it; a readout panel sits beside it (below on phones). Single dark look, taken from the poster. */
 :root {
   --void: #050807;
   --panel: #0a110d;
@@ -42,8 +42,8 @@ h1 {
   text-wrap: balance;
 }
 .sub { margin: 6px 0 0; color: var(--dim); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-.controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.counter { font-variant-numeric: tabular-nums; color: var(--moss); font-size: 13px; letter-spacing: .08em; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.counter { font-variant-numeric: tabular-nums; color: var(--moss); font-size: 13px; letter-spacing: .08em; margin-right: 4px; }
 button {
   font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   background: transparent; color: var(--phosphor); border: 1px solid var(--line);
@@ -59,19 +59,34 @@ main {
 }
 @media (max-width: 820px) { main { grid-template-columns: minmax(0, 1fr); } }
 
-.stage { position: relative; max-width: 100%; margin: 0 auto; width: 100%; max-width: 720px; user-select: none; }
-.stage img { display: block; width: 100%; height: auto; }
-.stage.shake { animation: shake .35s linear; }
+/* ---------- camera ---------- */
+.viewport {
+  position: relative; width: 100%; max-width: 720px; margin: 0 auto;
+  aspect-ratio: 959 / 1161; overflow: hidden; background: var(--void);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.shaker { position: absolute; inset: 0; }
+.shaker.shake { animation: shake .35s linear; }
+.shaker.glitch { animation: glitch .24s steps(3); }
 @keyframes shake {
-  20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); }
+  20% { transform: translate(-5px, 2px); } 40% { transform: translate(5px, -2px); }
   60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, -1px); }
 }
-canvas.fx, svg.fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+@keyframes glitch {
+  0% { transform: translate(4px, 0); filter: hue-rotate(50deg) contrast(1.5); }
+  50% { transform: translate(-4px, 1px); filter: saturate(2.2) brightness(1.3); }
+  100% { transform: none; filter: none; }
+}
+.camera { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; cursor: zoom-in; --inv: 1; }
+.cine .camera { cursor: zoom-out; }
+.camera img { display: block; width: 100%; height: 100%; }
+svg.beamfx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 .pin {
   position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px;
   border-radius: 50%; border: 1.5px solid var(--phosphor); background: rgba(5, 8, 7, .35);
-  cursor: pointer; padding: 0;
+  cursor: pointer; padding: 0; transform: scale(var(--inv)); transition: opacity .3s;
 }
 .pin::before {
   content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--phosphor);
@@ -84,19 +99,106 @@ canvas.fx, svg.fx { position: absolute; inset: 0; width: 100%; height: 100%; poi
 .pin.seen { border-color: var(--moss); }
 .pin.seen::before { background: var(--moss); box-shadow: none; inset: 11px; }
 .pin.seen::after { animation: none; opacity: 0; }
-.pin.active { border-color: var(--warn); }
-.pin.active::before { background: var(--warn); box-shadow: 0 0 12px var(--warn); }
+.cine .pin.active { opacity: 0; pointer-events: none; }
 .pin .tip {
   position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
   background: var(--void); border: 1px solid var(--line); color: var(--phosphor);
   font: 600 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
   padding: 5px 7px; white-space: nowrap; opacity: 0; transition: opacity .15s; pointer-events: none;
 }
-.pin:hover .tip, .pin:focus-visible .tip, .stage.reveal .pin .tip { opacity: 1; }
-.stage.quiet .pin:not(.active) { opacity: 0; }
-.stage.quiet .pin:not(.active):hover { opacity: 1; }
+.pin:hover .tip, .pin:focus-visible .tip, .reveal .pin .tip { opacity: 1; }
 @keyframes ping { from { transform: scale(1); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
 
+/* ---------- cinematic HUD ---------- */
+.hud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.scanlines, .vignette { position: absolute; inset: 0; opacity: 0; transition: opacity .7s; }
+.scanlines { background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .32) 0 1px, transparent 1px 3px); }
+.vignette { background: radial-gradient(ellipse at 50% 46%, transparent 50%, rgba(0, 0, 0, .8) 100%); }
+.cine .scanlines, .cine .vignette { opacity: 1; }
+.cine .scanlines { animation: flicker 4s steps(1) infinite; }
+@keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: .75; } 48% { opacity: 1; } 83% { opacity: .85; } }
+
+.bar {
+  position: absolute; left: 0; right: 0; background: var(--void); pointer-events: auto;
+  transition: transform .65s cubic-bezier(.7, 0, .2, 1);
+}
+.bar.top {
+  top: 0; transform: translateY(-101%); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px 8px 12px; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.bar.bottom {
+  bottom: 0; transform: translateY(101%); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 10px 10px 12px;
+}
+.cine .bar { transform: none; }
+.rec { color: var(--text); white-space: nowrap; }
+.rec::before { content: "●"; color: #ff5a4f; margin-right: 6px; animation: blink 1s steps(1) infinite; }
+.readout { color: var(--phosphor); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bar button { padding: 7px 9px; font-size: 11px; white-space: nowrap; }
+.bar .nav { font-size: 18px; padding: 6px 10px; line-height: 1; }
+.subtitle { min-width: 0; }
+.sub-tag { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.sub-title { font: 700 clamp(16px, 3.2vw, 21px)/1.15 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--phosphor); margin: 2px 0 4px; }
+.sub-text { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text); min-height: 3em; }
+@media (max-width: 480px) {
+  #tc { display: none; }
+  .rec { font-size: 0; } .rec::before { font-size: 11px; margin: 0; }
+  .sub-text { font-size: 11px; }
+}
+
+.reticle { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity .35s; --c: var(--phosphor); }
+.cine .reticle.on { opacity: 1; }
+.reticle.locked { --c: var(--warn); }
+.reticle .hair-x, .reticle .hair-y { position: absolute; background: var(--c); opacity: .3; }
+.reticle .hair-x { left: -3000px; width: 6000px; top: 0; height: 1px; }
+.reticle .hair-y { top: -3000px; height: 6000px; left: 0; width: 1px; }
+.reticle .box {
+  position: absolute; width: 84px; height: 84px; left: -42px; top: -42px;
+  --b: linear-gradient(var(--c), var(--c));
+  background:
+    var(--b) top left / 16px 2px no-repeat, var(--b) top left / 2px 16px no-repeat,
+    var(--b) top right / 16px 2px no-repeat, var(--b) top right / 2px 16px no-repeat,
+    var(--b) bottom left / 16px 2px no-repeat, var(--b) bottom left / 2px 16px no-repeat,
+    var(--b) bottom right / 16px 2px no-repeat, var(--b) bottom right / 2px 16px no-repeat;
+  transform: scale(2.3) rotate(45deg); transition: transform .5s cubic-bezier(.2, .8, .2, 1);
+  filter: drop-shadow(0 0 4px var(--c));
+}
+.reticle.locked .box { transform: scale(1) rotate(0); }
+.reticle .dot { position: absolute; width: 6px; height: 6px; left: -3px; top: -3px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.reticle .rlabel {
+  position: absolute; left: 50px; top: -48px; white-space: nowrap;
+  font: 600 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--void); background: var(--c); padding: 4px 6px;
+}
+.reticle.flip .rlabel { left: auto; right: 50px; }
+
+.enhance { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
+.enhance span {
+  font: 700 clamp(18px, 4vw, 30px)/1 var(--display); letter-spacing: .45em; text-indent: .45em; color: var(--phosphor);
+  border: 1px solid var(--phosphor); padding: 8px 14px; background: rgba(5, 8, 7, .65); text-transform: uppercase;
+}
+.enhance.go { animation: flash .75s linear; }
+@keyframes flash { 0% { opacity: 0; } 8% { opacity: 1; } 22% { opacity: .15; } 34% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.sweep { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--phosphor); box-shadow: 0 0 14px 2px var(--phosphor); opacity: 0; }
+.sweep.go { animation: sweep .8s ease-in-out; }
+@keyframes sweep { from { top: 0; opacity: 1; } to { top: 100%; opacity: .2; } }
+
+.boot {
+  position: absolute; inset: 0; background: rgba(5, 8, 7, .82); padding: 24px;
+  display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--phosphor);
+  animation: bootout .6s ease 1.9s forwards;
+}
+.boot p { margin: 0; opacity: 0; animation: bootline .01s linear forwards; }
+.boot p:nth-child(1) { animation-delay: .1s; } .boot p:nth-child(2) { animation-delay: .45s; }
+.boot p:nth-child(3) { animation-delay: .8s; } .boot p:nth-child(4) { animation-delay: 1.2s; color: var(--warn); }
+@keyframes bootline { to { opacity: 1; } }
+@keyframes bootout { to { opacity: 0; visibility: hidden; } }
+
+/* ---------- readout panel ---------- */
 aside {
   border: 1px solid var(--line); background: var(--panel); padding: 18px;
   position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); min-width: 0;
@@ -105,6 +207,7 @@ aside {
 aside h2 { font: 700 24px/1.1 var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--phosphor); margin: 10px 0 12px; text-wrap: balance; }
 aside p { margin: 0 0 14px; max-width: 65ch; }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 14px; font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+dl:empty { display: none; }
 dt { color: var(--dim); text-transform: uppercase; letter-spacing: .1em; }
 dd { margin: 0; color: var(--moss); font-variant-numeric: tabular-nums; text-align: right; }
 .hint { font-size: 12px; color: var(--dim); margin: 0; }
@@ -112,8 +215,10 @@ dd { margin: 0; color: var(--moss); font-variant-numeric: tabular-nums; text-ali
 @keyframes blink { 50% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .pin::after, .cursor::after { animation: none; }
-  .stage.shake { animation: none; }
+  .pin::after, .cursor::after, .rec::before, .cine .scanlines { animation: none; }
+  .shaker.shake, .shaker.glitch, .enhance.go, .sweep.go { animation: none; }
+  .bar, .reticle .box { transition: none; }
+  .boot { display: none; }
 }
 </style>
 </head>
@@ -121,237 +226,499 @@ dd { margin: 0; color: var(--moss); font-variant-numeric: tabular-nums; text-ali
 <header>
   <div>
     <h1>Operation Overgrowth</h1>
-    <p class="sub">Field unit GR-7 · click the targets on the poster</p>
+    <p class="sub">Field unit GR-7 · click anything to zoom in</p>
   </div>
   <div class="controls">
     <span class="counter" id="counter">00 / 10 scanned</span>
-    <button type="button" id="labels" aria-pressed="false">Show labels</button>
-    <button type="button" id="hide" aria-pressed="false">Hide targets</button>
+    <button type="button" id="tour" aria-pressed="false">Play tour</button>
+    <button type="button" id="labels" aria-pressed="false">Labels</button>
+    <button type="button" id="sound" aria-pressed="true">Sound on</button>
   </div>
 </header>
 
 <main>
-  <div class="stage" id="stage">
-    <img src="poster.png" alt="Poster: an armored astronaut fires a green beam that turns into a forest full of mushrooms, framed by HUD text panels." width="959" height="1161" draggable="false">
-    <svg class="fx" id="beamfx" viewBox="0 0 959 1161" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <div class="viewport" id="viewport">
+    <div class="shaker" id="shaker">
+      <div class="camera" id="camera">
+        <img src="poster.png" alt="Poster: an armored astronaut fires a green beam that turns into a forest full of mushrooms, framed by HUD text panels." width="959" height="1161" draggable="false">
+        <svg class="beamfx" id="beamfx" viewBox="0 0 959 1161" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
+    </div>
     <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+    <div class="hud" aria-hidden="false">
+      <div class="scanlines"></div>
+      <div class="vignette"></div>
+      <div class="reticle" id="reticle">
+        <div class="hair-x"></div><div class="hair-y"></div>
+        <div class="box"></div><div class="dot"></div>
+        <div class="rlabel" id="rlabel">Tracking</div>
+      </div>
+      <div class="sweep" id="sweep"></div>
+      <div class="enhance" id="enhance"><span>Enhance</span></div>
+      <div class="bar top">
+        <span class="rec">Rec · Cam-02</span>
+        <span class="readout" id="readout">Zoom 1.00×</span>
+        <span id="tc">00:00:00:00</span>
+        <button type="button" id="exit">Exit ✕</button>
+      </div>
+      <div class="bar bottom">
+        <button type="button" class="nav" id="prev" aria-label="Previous target">‹</button>
+        <div class="subtitle">
+          <div class="sub-tag" id="s-tag">Target</div>
+          <div class="sub-title" id="s-title">Acquiring</div>
+          <p class="sub-text" id="s-text"></p>
+        </div>
+        <button type="button" class="nav" id="next" aria-label="Next target">›</button>
+      </div>
+      <div class="boot" aria-hidden="true">
+        <p>&gt; Establishing uplink… ok</p>
+        <p>&gt; Cam-02 field feed · 24 fps</p>
+        <p>&gt; Subject: GR-7 · sector 09</p>
+        <p>&gt; Signal locked</p>
+      </div>
+    </div>
   </div>
 
   <aside aria-live="polite">
     <div class="tag"><span id="p-tag">Standby</span><span id="p-id">—</span></div>
     <h2 id="p-title">Awaiting target</h2>
-    <p id="p-text" class="cursor">Tap any glowing dot on the poster. Each one opens a readout, and some of them do something. Try the gun first.</p>
+    <p id="p-text" class="cursor">Click a glowing dot and the camera flies in on it. Click anywhere else on the poster to enhance that spot. Or hit Play tour and watch the whole thing like a film.</p>
     <dl id="p-stats"></dl>
-    <p class="hint" id="p-hint">Tip: press Tab to cycle through targets with the keyboard.</p>
+    <p class="hint" id="p-hint">Keys: ← → jump between targets while zoomed, Esc zooms back out.</p>
   </aside>
 </main>
 
 <script>
 const TARGETS = [
-  { id: "helmet", x: 51.2, y: 20.5, label: "Helmet",
+  { id: "helmet", x: 51.2, y: 20.5, z: 3.2, label: "Helmet",
     tag: "Crew", title: "GR-7 pressure helm",
     text: "Pitted ceramic shell, dented from three re-entries. The visor is tinted against the beam's glare. Nobody has seen the pilot's face since launch.",
     stats: [["Visor tint", "OD 4+"], ["Air left", "71 %"], ["Dents logged", "212"]], fx: "scan" },
-  { id: "gun", x: 20, y: 25.2, label: "Seeder rifle",
+  { id: "gun", x: 20, y: 25.2, z: 2.5, label: "Seeder rifle",
     tag: "Hardware", title: "Seeder rifle Mk II",
-    text: "It doesn't shoot bullets. It fires a 532 nm beam loaded with compressed spores that wake up on contact with rock. Click again to fire.",
+    text: "It doesn't shoot bullets. It fires a 532 nm beam loaded with compressed spores that wake up on contact with rock. Click the target again to fire.",
     stats: [["Wavelength", "532 nm"], ["Charge", "98 %"], ["Payload", "4.1 × 10⁹ spores"]], fx: "fire" },
-  { id: "reticle", x: 9.6, y: 25.5, label: "Reticle",
+  { id: "reticle", x: 9.6, y: 25.5, z: 3.4, label: "Reticle",
     tag: "HUD", title: "Targeting reticle",
     text: "The rangefinder ring locks on to barren ground and paints it green before the beam lands. Range and bearing tick in the corner.",
     stats: [["Range", "38.4 m"], ["Bearing", "271°"], ["Lock", "Solid"]], fx: "spin" },
-  { id: "beam", x: 31, y: 32, label: "Beam",
+  { id: "beam", x: 31, y: 32, z: 2.4, label: "Beam",
     tag: "Phenomenon", title: "The growth cone",
     text: "Where the beam spreads out, dead stone turns into living soil in under a second. The edge of the cone is the only place you can watch it happen.",
     stats: [["Spread", "22°"], ["Growth rate", "3.6 m/s"], ["Soil depth", "40 cm"]], fx: "fire" },
-  { id: "arm", x: 58, y: 29, label: "Shoulder rig",
+  { id: "arm", x: 58, y: 29, z: 2.8, label: "Shoulder rig",
     tag: "Hardware", title: "Recoil shoulder rig",
     text: "Hydraulic pads soak up the kick when the rifle discharges. Without it the pilot would spin off into the dark on every shot.",
     stats: [["Recoil", "1.9 kN"], ["Hydraulics", "Nominal"]], fx: "scan" },
-  { id: "mushroom", x: 71.6, y: 61.2, label: "Mushrooms",
-    tag: "Biology", title: "Lantern caps",
-    text: "The first thing to sprout. Each cap puffs out spores that seed the next metre of forest. Click to shake some loose.",
-    stats: [["Cap width", "4–9 cm"], ["Spores / puff", "~12 000"], ["Edible", "Unknown"]], fx: "spores" },
-  { id: "forest", x: 74, y: 49, label: "Canopy",
+  { id: "forest", x: 74, y: 49, z: 2.2, label: "Canopy",
     tag: "Biology", title: "Instant canopy",
     text: "A full shrub layer, grown in the time it took to read this sentence. Moss, low pines and something that smells a lot like thyme.",
     stats: [["Species", "37 found"], ["O₂ output", "+14 %"], ["Age", "6 seconds"]], fx: "leaves" },
-  { id: "rock", x: 88.6, y: 70, label: "Boulder",
+  { id: "mushroom", x: 71.6, y: 61.2, z: 3.4, label: "Mushrooms",
+    tag: "Biology", title: "Lantern caps",
+    text: "The first thing to sprout. Each cap puffs out spores that seed the next metre of forest. Click the target again to shake some loose.",
+    stats: [["Cap width", "4–9 cm"], ["Spores / puff", "~12 000"], ["Edible", "Unknown"]], fx: "spores" },
+  { id: "rock", x: 88.6, y: 70, z: 3, label: "Boulder",
     tag: "Geology", title: "Unconverted boulder",
     text: "Grey basalt the beam hasn't reached yet. Lichen is already creeping up one side. Give it a minute.",
     stats: [["Mass", "~2.3 t"], ["Converted", "8 %"]], fx: "scan" },
-  { id: "leg", x: 38.5, y: 66, label: "Leg armor",
+  { id: "leg", x: 38.5, y: 66, z: 2.6, label: "Leg armor",
     tag: "Hardware", title: "Knee and shin plating",
     text: "The lower plates are crusted with grit from a planet that had nothing growing on it an hour ago. Mud on the boots is a new problem.",
     stats: [["Plate", "Ceramic-Ti"], ["Wear", "31 %"]], fx: "scan" },
-  { id: "hud", x: 12.5, y: 9.5, label: "Log panel",
+  { id: "hud", x: 12.5, y: 9.5, z: 3, label: "Log panel",
     tag: "HUD", title: "Mission log",
     text: "Day 212. Sector nine was bare rock this morning. Tonight it has a forest, a lot of mushrooms and, according to the sensors, one very confused beetle.",
     stats: [["Sectors greened", "9 / 40"], ["Uptime", "212 d"]], fx: "decode" }
 ];
+const FREE_LINES = [
+  "No target on file. At this depth it's mostly moss and noise.",
+  "Nothing flagged here. Logged as probably fine.",
+  "Unregistered patch. The sensors say rock and the pixels disagree.",
+  "No record for this spot. Enhancing anyway, because that's what you do."
+];
 
-const stage = document.getElementById("stage");
-const counter = document.getElementById("counter");
-const els = {
-  tag: document.getElementById("p-tag"), id: document.getElementById("p-id"),
-  title: document.getElementById("p-title"), text: document.getElementById("p-text"),
-  stats: document.getElementById("p-stats"), hint: document.getElementById("p-hint")
-};
+const $ = id => document.getElementById(id);
+const viewport = $("viewport"), shaker = $("shaker"), camera = $("camera");
+const reticle = $("reticle"), rlabel = $("rlabel"), readout = $("readout"), tc = $("tc");
+const panel = { tag: $("p-tag"), id: $("p-id"), title: $("p-title"), text: $("p-text"), stats: $("p-stats"), hint: $("p-hint") };
+const subs = { tag: $("s-tag"), title: $("s-title"), text: $("s-text") };
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const seen = new Set();
-let active = null;
+const pad = (n, l = 2) => String(n).padStart(l, "0");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-TARGETS.forEach((t, i) => {
+/* ---------- sound (synthesised, starts on first click) ---------- */
+const sfx = (() => {
+  let ac = null, noiseBuf = null, on = true;
+  try { on = localStorage.getItem("overgrowth-sound") !== "off"; } catch (e) {}
+  function ctx() {
+    if (!on) return null;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { return null; }
+    return ac;
+  }
+  function noise(a) {
+    if (!noiseBuf) {
+      noiseBuf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const s = a.createBufferSource(); s.buffer = noiseBuf; return s;
+  }
+  function env(g, t, peak, dur) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + Math.min(.08, dur / 3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  }
+  function blip(freq, dur, delay = 0, type = "sine", vol = .07) {
+    const a = ctx(); if (!a) return;
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.value = freq; env(g, t, vol, dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+  }
+  return {
+    get on() { return on; },
+    set on(v) { on = v; try { localStorage.setItem("overgrowth-sound", v ? "on" : "off"); } catch (e) {} },
+    whoosh(dur = .9, up = true) {
+      const a = ctx(); if (!a) return;
+      const t = a.currentTime, n = noise(a), f = a.createBiquadFilter(), g = a.createGain();
+      f.type = "bandpass"; f.Q.value = 3;
+      f.frequency.setValueAtTime(up ? 260 : 2400, t);
+      f.frequency.exponentialRampToValueAtTime(up ? 2800 : 220, t + dur);
+      env(g, t, .35, dur);
+      n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + dur + .05);
+    },
+    blip,
+    lock() { blip(1320, .06); blip(1760, .09, .08); },
+    enhance() { [523, 784, 1046, 1568].forEach((f, i) => blip(f, .06, i * .055, "square", .03)); },
+    fire() {
+      const a = ctx(); if (!a) return;
+      const t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+      o.type = "sawtooth"; o.frequency.setValueAtTime(1600, t); o.frequency.exponentialRampToValueAtTime(70, t + .5);
+      env(g, t, .09, .55); o.connect(g).connect(a.destination); o.start(t); o.stop(t + .6);
+      const n = noise(a), f = a.createBiquadFilter(), g2 = a.createGain();
+      f.type = "lowpass"; f.frequency.setValueAtTime(5000, t); f.frequency.exponentialRampToValueAtTime(200, t + .6);
+      env(g2, t, .3, .6); n.connect(f).connect(g2).connect(a.destination); n.start(t); n.stop(t + .65);
+    }
+  };
+})();
+
+/* ---------- camera ---------- */
+let cam = { u: .5, v: .5, s: 1 };           // focus point as a fraction of the poster, plus zoom
+let view = { tx: 0, ty: 0, s: 1 };          // resolved transform in px
+let run = 0;                                // bumps on every new camera move so old ones stop
+let cine = false, active = null, reticleOn = null;
+const seen = new Set();
+
+function project(c) {
+  const w = camera.offsetWidth, h = camera.offsetHeight, s = c.s;
+  let tx = w / 2 - s * c.u * w, ty = h * .46 - s * c.v * h;
+  tx = Math.min(0, Math.max(w - s * w, tx));
+  ty = Math.min(0, Math.max(h - s * h, ty));
+  return { tx, ty, s };
+}
+function apply() {
+  view = project(cam);
+  camera.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`;
+  camera.style.setProperty("--inv", (1 / view.s).toFixed(4));
+  readout.textContent = `Zoom ${view.s.toFixed(2)}× · X ${pad(Math.round(cam.u * 959), 4)} Y ${pad(Math.round(cam.v * 1161), 4)}`;
+  if (reticleOn) {
+    const sx = view.tx + view.s * reticleOn.x / 100 * camera.offsetWidth;
+    const sy = view.ty + view.s * reticleOn.y / 100 * camera.offsetHeight;
+    reticle.style.transform = `translate(${sx}px, ${sy}px)`;
+    reticle.classList.toggle("flip", sx > viewport.clientWidth * .55);
+  }
+}
+function tween(to, ms, { dip = 0, blur = 0 } = {}, my = run) {
+  const from = { ...cam };
+  if (reduced || ms <= 0) { Object.assign(cam, to); apply(); return Promise.resolve(my === run); }
+  return new Promise(res => {
+    const t0 = performance.now();
+    function step(now) {
+      if (my !== run) { camera.style.filter = ""; return res(false); }
+      const t = Math.min(1, (now - t0) / ms), e = ease(t);
+      cam.u = lerp(from.u, to.u, e);
+      cam.v = lerp(from.v, to.v, e);
+      cam.s = Math.max(1, lerp(from.s, to.s, e) - dip * Math.sin(Math.PI * e));
+      camera.style.filter = blur ? `blur(${(blur * Math.sin(Math.PI * t)).toFixed(2)}px)` : "";
+      apply();
+      if (t < 1) requestAnimationFrame(step);
+      else { camera.style.filter = ""; res(true); }
+    }
+    requestAnimationFrame(step);
+  });
+}
+function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+/* ---------- pins ---------- */
+TARGETS.forEach(t => {
   const b = document.createElement("button");
   b.type = "button";
   b.className = "pin";
   b.style.left = t.x + "%";
   b.style.top = t.y + "%";
-  b.setAttribute("aria-label", t.label);
+  b.setAttribute("aria-label", "Zoom in on " + t.label);
   b.innerHTML = `<span class="tip">${t.label}</span>`;
-  b.addEventListener("click", () => select(t, b));
+  b.addEventListener("click", e => { e.stopPropagation(); focusOn(t); });
   t.el = b;
-  stage.appendChild(b);
+  camera.appendChild(b);
 });
 
-function select(t, b) {
-  const again = active === t;
-  if (active) active.el.classList.remove("active");
+function setActive(t) {
+  if (active && active.el) active.el.classList.remove("active");
   active = t;
-  b.classList.add("active", "seen");
-  seen.add(t.id);
-  counter.textContent = String(seen.size).padStart(2, "0") + " / " + String(TARGETS.length).padStart(2, "0") + " scanned";
+  if (t.el) {
+    t.el.classList.add("active", "seen");
+    seen.add(t.id);
+    $("counter").textContent = pad(seen.size) + " / " + pad(TARGETS.length) + " scanned";
+  }
+  const idx = TARGETS.indexOf(t);
+  const num = idx >= 0 ? "#" + pad(idx + 1) : "#??";
+  panel.tag.textContent = t.tag;
+  panel.id.textContent = num;
+  panel.title.textContent = t.title;
+  panel.stats.innerHTML = t.stats.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  panel.hint.textContent = seen.size === TARGETS.length ? "All targets scanned. Sector cleared for planting." : "Keys: ← → jump between targets while zoomed, Esc zooms back out.";
+  subs.tag.textContent = (idx >= 0 ? `Target ${pad(idx + 1)} / ${TARGETS.length}` : "Unlisted") + " · " + t.tag;
+  subs.title.textContent = t.title;
+  stopTyping();
+  panel.text.textContent = subs.text.textContent = "Acquiring target…";
+  reticleOn = t;
+  reticle.classList.add("on");
+  reticle.classList.remove("locked");
+  rlabel.textContent = "Tracking";
+}
+function lock(t) {
+  reticle.classList.add("locked");
+  rlabel.textContent = "Locked · " + t.label;
+  typeOut([panel.text, subs.text], t.text, t.fx === "decode");
+}
+function enterCine() { cine = true; viewport.classList.add("cine"); }
+function exitCine() { cine = false; viewport.classList.remove("cine"); reticle.classList.remove("on", "locked"); }
 
-  els.tag.textContent = t.tag;
-  els.id.textContent = "#" + String(TARGETS.indexOf(t) + 1).padStart(2, "0");
-  els.title.textContent = t.title;
-  els.stats.innerHTML = t.stats.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-  els.hint.textContent = seen.size === TARGETS.length ? "All targets scanned. Sector cleared for planting." : "";
-  typeOut(els.text, t.text, t.fx === "decode");
-
-  const rect = stage.getBoundingClientRect();
-  const px = t.x / 100 * rect.width, py = t.y / 100 * rect.height;
-  if (!again && t.fx !== "fire") ripple(px, py);
-  ({ fire, scan: () => scan(px, py), spores: () => burst(px, py, "spore"), leaves: () => burst(px, py, "leaf"), spin: () => spin(px, py), decode: () => scan(px, py) })[t.fx]?.();
+async function focusOn(t, { fromTour = false } = {}) {
+  if (!fromTour) stopTour();
+  const again = cine && active === t && reticle.classList.contains("locked");
+  if (again) { sfx.lock(); runFx(t); return true; }
+  const my = ++run;
+  setActive(t);
+  enterCine();
+  apply();
+  sfx.blip(660, .05);
+  const to = { u: t.x / 100, v: t.y / 100, s: t.z };
+  let ok;
+  if (cam.s > 1.05) {
+    sfx.whoosh(1.4);
+    ok = await tween(to, 1500, { dip: Math.min(cam.s, to.s) * .45, blur: 1.4 }, my);
+  } else {
+    sfx.whoosh(.85);
+    ok = await tween({ ...to, s: 1 + (to.s - 1) * .5 }, 800, { blur: 2 }, my);
+    if (!ok) return false;
+    if (!reduced) {
+      restart($("enhance"), "go"); restart($("sweep"), "go"); restart(shaker, "glitch");
+      sfx.enhance();
+      await sleep(220);
+      if (my !== run) return false;
+    }
+    ok = await tween(to, 650, { blur: 1 }, my);
+  }
+  if (!ok) return false;
+  lock(t);
+  sfx.lock();
+  runFx(t);
+  return true;
+}
+async function zoomOut() {
+  stopTour();
+  const my = ++run;
+  exitCine();
+  if (active && active.el) active.el.classList.remove("active");
+  reticleOn = null;
+  sfx.whoosh(.7, false);
+  await tween({ u: .5, v: .5, s: 1 }, 950, { blur: 1.2 }, my);
+}
+function stepTarget(d) {
+  const i = TARGETS.indexOf(active);
+  const n = i < 0 ? 0 : (i + d + TARGETS.length) % TARGETS.length;
+  focusOn(TARGETS[n]);
 }
 
-/* text typing / decoding */
+/* click empty space: enhance that spot, or back out if already zoomed */
+camera.addEventListener("click", e => {
+  if (cine) { zoomOut(); return; }
+  const r = viewport.getBoundingClientRect();
+  const x = (e.clientX - r.left - view.tx) / view.s, y = (e.clientY - r.top - view.ty) / view.s;
+  const u = Math.min(1, Math.max(0, x / camera.offsetWidth)), v = Math.min(1, Math.max(0, y / camera.offsetHeight));
+  const X = Math.round(u * 959), Y = Math.round(v * 1161);
+  focusOn({
+    id: "free", x: u * 100, y: v * 100, z: 3, label: "Sector " + pad(X, 4) + "·" + pad(Y, 4),
+    tag: "Unlisted", title: "Sector " + pad(X, 4) + "·" + pad(Y, 4),
+    text: FREE_LINES[Math.random() * FREE_LINES.length | 0],
+    stats: [["X", pad(X, 4)], ["Y", pad(Y, 4)], ["Match", "None"]], fx: "scan"
+  });
+});
+
+/* ---------- typing ---------- */
 let typeTimer;
-function typeOut(el, text, scramble) {
-  clearInterval(typeTimer);
-  if (reduced) { el.textContent = text; el.classList.remove("cursor"); return; }
-  el.classList.add("cursor");
+function stopTyping() { clearInterval(typeTimer); panel.text.classList.remove("cursor"); }
+function typeOut(els, text, scramble) {
+  stopTyping();
+  if (reduced) { els.forEach(el => el.textContent = text); return; }
+  panel.text.classList.add("cursor");
   let i = 0;
   const glyphs = "#%&@$*+=/<>01";
   typeTimer = setInterval(() => {
-    i += scramble ? 2 : 3;
+    i += 2;
     let out = text.slice(0, i);
-    if (scramble && i < text.length) {
-      for (let k = 0; k < 6 && i + k < text.length; k++) out += glyphs[Math.random() * glyphs.length | 0];
-    }
-    el.textContent = out;
-    if (i >= text.length) { el.textContent = text; clearInterval(typeTimer); el.classList.remove("cursor"); }
-  }, 16);
+    if (scramble && i < text.length) for (let k = 0; k < 6 && i + k < text.length; k++) out += glyphs[Math.random() * glyphs.length | 0];
+    els.forEach(el => el.textContent = out);
+    if (i >= text.length) { els.forEach(el => el.textContent = text); stopTyping(); }
+  }, 18);
 }
 
-/* beam flash along the painted beam */
-const svg = document.getElementById("beamfx");
+/* ---------- effects ---------- */
+function runFx(t) {
+  const x = t.x / 100 * camera.offsetWidth, y = t.y / 100 * camera.offsetHeight;
+  ({
+    fire,
+    spores: () => burst(x, y, "spore"),
+    leaves: () => burst(x, y, "leaf"),
+    spin: () => overlay("spin", x, y, 90),
+    scan: () => overlay("scan", x, y, 70),
+    decode: () => overlay("scan", x, y, 70)
+  })[t.fx]?.();
+}
+
+const svg = $("beamfx");
 function fire() {
+  sfx.fire();
   if (reduced) return;
-  stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake");
+  restart(shaker, "shake");
   const NS = "http://www.w3.org/2000/svg";
-  const paths = ["M140 292 L420 420 L905 600", "M150 300 L440 380 L500 900", "M145 296 L430 400 L700 760"];
-  paths.forEach((d, i) => {
+  ["M140 292 L420 420 L905 600", "M150 300 L440 380 L500 900", "M145 296 L430 400 L700 760"].forEach((d, i) => {
     const p = document.createElementNS(NS, "path");
     p.setAttribute("d", d);
     p.setAttribute("fill", "none");
     p.setAttribute("stroke", "#6cf59a");
     p.setAttribute("stroke-width", i === 2 ? 9 : 4);
     p.setAttribute("stroke-linecap", "round");
+    p.setAttribute("stroke-dasharray", 1400);
     p.style.filter = "drop-shadow(0 0 6px #6cf59a)";
-    const len = 1400;
-    p.setAttribute("stroke-dasharray", len);
-    p.setAttribute("stroke-dashoffset", len);
     svg.appendChild(p);
-    p.animate([{ strokeDashoffset: len, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: .55 }, { strokeDashoffset: 0, opacity: 0 }],
+    p.animate([{ strokeDashoffset: 1400, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: .55 }, { strokeDashoffset: 0, opacity: 0 }],
       { duration: 700, delay: i * 40, easing: "ease-out", fill: "forwards" }).onfinish = () => p.remove();
   });
-  const r = stage.getBoundingClientRect();
-  setTimeout(() => burst(.72 * r.width, .62 * r.height, "leaf"), 380);
+  setTimeout(() => burst(.72 * camera.offsetWidth, .62 * camera.offsetHeight, "leaf"), 380);
 }
 
-/* canvas particles */
-const canvas = document.getElementById("fx");
-const ctx = canvas.getContext("2d");
+/* particles live in poster coordinates and are projected through the camera each frame */
+const canvas = $("fx"), ctx = canvas.getContext("2d");
 let parts = [], running = false;
 function sizeCanvas() {
-  const r = stage.getBoundingClientRect(), d = devicePixelRatio || 1;
-  canvas.width = r.width * d; canvas.height = r.height * d;
+  const d = devicePixelRatio || 1;
+  canvas.width = viewport.clientWidth * d; canvas.height = viewport.clientHeight * d;
   ctx.setTransform(d, 0, 0, d, 0, 0);
 }
-new ResizeObserver(sizeCanvas).observe(stage);
+new ResizeObserver(() => { sizeCanvas(); apply(); }).observe(viewport);
 
 function add(p) { parts.push(p); if (!running) { running = true; requestAnimationFrame(tick); } }
 function tick() {
-  const r = stage.getBoundingClientRect();
-  ctx.clearRect(0, 0, r.width, r.height);
+  ctx.clearRect(0, 0, viewport.clientWidth, viewport.clientHeight);
+  const k = Math.sqrt(view.s);
   parts = parts.filter(p => (p.life -= 1) > 0);
   for (const p of parts) {
     p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .985; p.rot += p.vr;
-    const a = Math.min(1, p.life / 30);
     ctx.save();
-    ctx.globalAlpha = a;
-    ctx.translate(p.x, p.y);
-    if (p.kind === "ring") {
-      ctx.strokeStyle = "#6cf59a"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(0, 0, p.r += 1.6, 0, Math.PI * 2); ctx.stroke();
-    } else if (p.kind === "scan") {
-      ctx.strokeStyle = "#6cf59a"; ctx.lineWidth = 1;
-      const w = 90, h = 90, y = -h / 2 + (1 - p.life / p.max) * h;
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
-      ctx.fillStyle = "rgba(108,245,154,.25)"; ctx.fillRect(-w / 2, y, w, 3);
+    ctx.globalAlpha = Math.min(1, p.life / 30);
+    ctx.translate(view.tx + view.s * p.x, view.ty + view.s * p.y);
+    if (p.kind === "scan") {
+      const w = 110, y = -w / 2 + (1 - p.life / p.max) * w;
+      ctx.strokeStyle = "#6cf59a"; ctx.lineWidth = 1; ctx.strokeRect(-w / 2, -w / 2, w, w);
+      ctx.fillStyle = "rgba(108,245,154,.3)"; ctx.fillRect(-w / 2, y, w, 3);
     } else if (p.kind === "spin") {
       ctx.rotate(p.rot); ctx.strokeStyle = "#f2d27a"; ctx.lineWidth = 1.5;
-      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(0, 0, 42, k * Math.PI / 2 + .2, k * Math.PI / 2 + 1.2); ctx.stroke(); }
+      for (let q = 0; q < 4; q++) { ctx.beginPath(); ctx.arc(0, 0, 60, q * Math.PI / 2 + .2, q * Math.PI / 2 + 1.2); ctx.stroke(); }
     } else if (p.kind === "leaf") {
       ctx.rotate(p.rot); ctx.fillStyle = p.c;
-      ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.8, p.r, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.8 * k, p.r * k, 0, 0, Math.PI * 2); ctx.fill();
     } else {
       ctx.fillStyle = p.c; ctx.shadowColor = p.c; ctx.shadowBlur = 6;
-      ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, p.r * k, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
   if (parts.length) requestAnimationFrame(tick); else running = false;
 }
-function ripple(x, y) { if (!reduced) add({ kind: "ring", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: 0, r: 8, life: 40, max: 40 }); }
-function scan(x, y) { if (!reduced) add({ kind: "scan", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: 0, life: 70, max: 70 }); }
-function spin(x, y) { if (!reduced) add({ kind: "spin", x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: .08, life: 90, max: 90 }); }
+function overlay(kind, x, y, life) { if (!reduced) add({ kind, x, y, vx: 0, vy: 0, g: 0, rot: 0, vr: .08, life, max: life }); }
 function burst(x, y, kind) {
   if (reduced) return;
-  const n = kind === "spore" ? 60 : 36;
+  const n = kind === "spore" ? 70 : 40, sp = 1 / Math.sqrt(view.s);
   const cols = kind === "spore" ? ["#f4f1d0", "#e8f7c8", "#f2d27a"] : ["#4f8a3a", "#7fb04d", "#2f6b34", "#9bc46a"];
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2, s = Math.random() * (kind === "spore" ? 1.6 : 3.2);
-    add({ kind, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - (kind === "spore" ? 1.2 : 1.5),
-      g: kind === "spore" ? -0.01 : 0.06, rot: Math.random() * 6, vr: (Math.random() - .5) * .2,
+    const a = Math.random() * Math.PI * 2, s = Math.random() * (kind === "spore" ? 1.6 : 3.2) * sp;
+    add({ kind, x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - (kind === "spore" ? 1.1 : 1.5) * sp,
+      g: (kind === "spore" ? -0.01 : 0.06) * sp, rot: Math.random() * 6, vr: (Math.random() - .5) * .2,
       r: kind === "spore" ? 1 + Math.random() * 2 : 2 + Math.random() * 3,
       c: cols[Math.random() * cols.length | 0], life: 60 + Math.random() * 60, max: 120 });
   }
 }
 
-/* controls */
-const labelsBtn = document.getElementById("labels");
-labelsBtn.addEventListener("click", () => {
-  const on = stage.classList.toggle("reveal");
-  labelsBtn.setAttribute("aria-pressed", on);
+/* ---------- tour ---------- */
+let tourRun = 0, touring = false;
+const tourBtn = $("tour");
+function setTour(on) { touring = on; tourBtn.setAttribute("aria-pressed", on); tourBtn.textContent = on ? "Stop tour" : "Play tour"; }
+function stopTour() { if (touring) { tourRun++; setTour(false); } }
+async function playTour() {
+  const my = ++tourRun;
+  setTour(true);
+  for (const t of TARGETS) {
+    if (my !== tourRun) return;
+    const ok = await focusOn(t, { fromTour: true });
+    if (!ok || my !== tourRun) return;
+    await sleep(5500);
+  }
+  if (my === tourRun) zoomOut();
+}
+tourBtn.addEventListener("click", () => touring ? zoomOut() : playTour());
+
+/* ---------- controls ---------- */
+$("exit").addEventListener("click", zoomOut);
+$("prev").addEventListener("click", () => stepTarget(-1));
+$("next").addEventListener("click", () => stepTarget(1));
+const labelsBtn = $("labels");
+labelsBtn.addEventListener("click", () => labelsBtn.setAttribute("aria-pressed", viewport.classList.toggle("reveal")));
+const soundBtn = $("sound");
+function syncSound() { soundBtn.setAttribute("aria-pressed", sfx.on); soundBtn.textContent = sfx.on ? "Sound on" : "Sound off"; }
+soundBtn.addEventListener("click", () => { sfx.on = !sfx.on; syncSound(); if (sfx.on) sfx.blip(880, .06); });
+syncSound();
+addEventListener("keydown", e => {
+  if (e.key === "Escape" && (cine || touring)) { zoomOut(); return; }
+  if (!cine) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); stepTarget(1); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); stepTarget(-1); }
 });
-const hideBtn = document.getElementById("hide");
-hideBtn.addEventListener("click", () => {
-  const on = stage.classList.toggle("quiet");
-  hideBtn.setAttribute("aria-pressed", on);
-  hideBtn.textContent = on ? "Show targets" : "Hide targets";
-});
+
+/* timecode, 24 fps */
+const t0 = performance.now();
+setInterval(() => {
+  if (!cine) return;
+  const f = Math.floor((performance.now() - t0) / 1000 * 24);
+  tc.textContent = `${pad(f / 86400 | 0)}:${pad((f / 1440 | 0) % 60)}:${pad((f / 24 | 0) % 60)}:${pad(f % 24)}`;
+}, 1000 / 24);
+
+/* opening shot: start close on the helmet and pull back */
+sizeCanvas();
+if (reduced) apply();
+else {
+  cam = { u: .51, v: .24, s: 1.4 };
+  apply();
+  const my = run;
+  sleep(300).then(() => tween({ u: .5, v: .5, s: 1 }, 1900, { blur: 2.5 }, my));
+}
 </script>
 </body>
 </html>
